@@ -469,8 +469,11 @@ export async function ensureChromeExtensionRelayServer(opts: {
 
     if (pathname === "/extension") {
       if (extensionWs) {
-        rejectUpgrade(socket, 409, "Extension already connected");
-        return;
+        // Replace stale connection (e.g. after Chrome restart) instead of
+        // rejecting — the old WebSocket may not have fired its close event yet.
+        log.info("Replacing stale extension WebSocket with new connection");
+        try { extensionWs.close(1001, "replaced by new connection"); } catch {}
+        extensionWs = null;
       }
       wssExtension.handleUpgrade(req, socket, head, (ws) => {
         wssExtension.emit("connection", ws, req);
